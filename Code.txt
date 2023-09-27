@@ -1,0 +1,145 @@
+set long 50000
+set linesize 300
+col x format a80 word_wrapped;
+
+drop table Book cascade constraints;
+
+create table Book(
+    Bookid varchar2(10),
+    ISBN  varchar2(10) primary key,
+    AuthorName varchar2(25),
+    Title varchar2(25),
+    Publication_date date, 
+    PublisherName varchar2(25),
+    Genre varchar2(20),
+    ShelfId varchar2(10),
+    Rack_no varchar2(10),
+    AvailabilityStatus varchar2(10)
+);
+
+insert into Book values('B1','I401','Enid Blyton','Secret Seven',TO_DATE('01-OCT-1999','DD-MON-YYYY'),'Bloomsberg','Thriller','S101','R101');
+insert into Book values('B1','I402','Enid Blyton','Secret Seven',TO_DATE('01-MAR-2000','DD-MON-YYYY'),'Oswal','Thriller','S101','R101');
+insert into Book values('B2','I403','JK Rowling','Harry Potter',TO_DATE('01-MAR-1998','DD-MON-YYYY'),'Dhanpat Rai','Non Fiction','S102','R102');
+insert into Book values('B2','I404','JK Rowling','Harry Potter',TO_DATE('01-MAR-2002','DD-MON-YYYY'),'Dhanpat Rai','Non Fiction','S102','R102');
+
+
+drop table Members cascade constraints;
+
+create table Members( 
+  MemberId varchar2(20) primary key,
+  MemberName varchar2(20),
+  Address varchar2(30),
+  Phone_Number NUMBER(15),
+  Email varchar2(25),
+  Membership_type varchar2(20),
+  Registration_date date
+);
+
+insert into Members values ('M1','John','Kelambakkam',9002311287,'john@gmail.com','Premium',TO_DATE('01-OCT-2010','DD-MON-YYYY'));
+insert into Members values ('M2','Ravi','Virugambakkam',9104351287,'Ravi@gmail.com','Normal',TO_DATE('01-OCT-2015','DD-MON-YYYY'));
+insert into Members values ('M3','Naren','Porur',9238711287,'Nare@gmail.com','Premium',TO_DATE('01-OCT-2009','DD-MON-YYYY'));
+insert into Members values ('M4','Veer','Madipakkam',9866311287,'Veer@gmail.com','Normal',TO_DATE('01-OCT-2016','DD-MON-YYYY'));
+
+
+drop table Transaction cascade constraints;
+
+
+create table Transaction(
+    Transaction_ID varchar2(5) primary key,
+    Members_ID varchar2(5) Constraint Members_id_fk references Members(MemberID),
+    Book_ID varchar2(5) ,
+    Borrow_Date date,
+    Return_Date date,
+    Fine_Amount NUMBER(5)
+);
+
+insert into Transaction values('T001','M1','B1',TO_DATE('01-OCT-2011','DD-MON-YYYY'),TO_DATE('01-DEC-2011','DD-MON-YYYY'),500);
+insert into Transaction values('T002','M2','B2',TO_DATE('01-APR-2017','DD-MON-YYYY'),TO_DATE('01-MAY-2017','DD-MON-YYYY'),800);
+insert into Transaction values('T003','M3','B3',TO_DATE('01-OCT-2012','DD-MON-YYYY'),TO_DATE('01-DEC-2012','DD-MON-YYYY'),700);
+
+
+drop table Author;
+
+create table Author(
+    AuthorId varchar2(10) primary key,
+    AuthorName varchar2(25),
+    Nationality varchar2(25),
+    Birthdate date);
+
+
+insert into Author values('A1','Enid Blyton','British',TO_DATE('01-OCT-1980','DD-MON-YYYY'));
+insert into Author values('A2','Elle','French',TO_DATE('01-OCT-1979','DD-MON-YYYY'));
+insert into Author values('A3','JK Rowling','American',TO_DATE('01-OCT-1975','DD-MON-YYYY'));
+insert into Author values('A4','Sudha Murthy','Indian',TO_DATE('01-OCT-1975','DD-MON-YYYY'));
+
+
+drop table Publisher;
+
+create table Publisher(
+    Publisher_id varchar2(10) primary key,
+    Publisher_name varchar2(20),
+    Address varchar2(20),
+    Phone_Number NUMBER(15)
+);
+
+insert into Publisher values('P001','Bloomsberg','Kanchipuram',9982567983);
+insert into Publisher values('P002','Dhanpat Rai','Kodambakkam',9182777983);
+insert into Publisher values('P003','Rudrak','Adyar',9282337983);
+insert into Publisher values('P004','Sai','Guindy',9772562981);
+
+
+
+
+
+
+
+CREATE or replace TRIGGER check_FINE
+BEFORE INSERT ON transaction
+FOR EACH ROW
+DECLARE total_fine INT;
+duplicate_info EXCEPTION;
+PRAGMA EXCEPTION_INIT (duplicate_info, -00001);
+BEGIN
+    SELECT SUM(fine_amount)
+    INTO total_fine
+    FROM transaction
+    WHERE members_id = :NEW.members_id;
+
+
+    IF total_fine + :NEW.fine_amount > 1000 THEN
+       RAISE_APPLICATION_ERROR ( num=> -20107, msg=> 'You cant borrow a book unless you clear your fines!');
+    END IF;
+END
+/
+
+
+
+
+REM ------------------------------ INCORRECT -----------------------------------
+
+create or replace trigger check_avail
+before insert on TRANSACTION
+for each ROW
+DECLARE
+temp int;
+duplicate_info EXCEPTION;
+PRAGMA EXCEPTION_INIT (duplicate_info, -00001);
+BEGIN
+select count(*)
+into TEMP
+from book
+  where bookid=:new.book_id
+and AvailabilityStatus='yes';
+
+if temp=0 THEN
+RAISE_APPLICATION_ERROR ( num=> -20107, msg=> 'Book not available');
+
+else
+  UPDATE book
+  SET AvailabilityStatus = 'no'
+  WHERE book_id = :NEW.book_id
+  AND AvailabilityStatus = 'yes'
+  LIMIT 1;
+end if;
+end;
+/
